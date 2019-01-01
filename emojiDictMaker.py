@@ -163,22 +163,4 @@ def emojiDictMaker(dumpTheDict=False):
 	utilsOs.dumpDictToJsonFile(emojiNameDict, pathOutputFile=u'./emojiDict/emojiNameDict.json', overwrite=True)
 
 
-def augmentEmojiDict(dumpTheDict=False):
-	'''	'''
-	emojiCharDictPath = u'./emojiDict/emojiCharDict.json'
-	emojiNameDictPath = u'./emojiDict/emojiNameDict.json'
-	emojiCharDict = utilsOs. openJsonFileAsDict(emojiCharDictPath)
-	emojiNameDict = utilsOs. openJsonFileAsDict(emojiNameDictPath)
-	#browse the dict to augment
-	for emojiKey, emojiDict in emojiCharDict.itens():
-		#augment by splitting on the labels
-		if u':' in emojiDict[u'preferedLabel']:
-
-		#add hashtags
-	#dump the dicts to json files
-	utilsOs.dumpDictToJsonFile(emojiCharDict, pathOutputFile=u'./emojiDict/emojiCharDictExt.json', overwrite=True)
-	utilsOs.dumpDictToJsonFile(emojiNameDict, pathOutputFile=u'./emojiDict/emojiNameDictExt.json', overwrite=True)
-
-
-#emojiDictMaker(dumpTheDict=True)
-augmentEmojiDict(dumpTheDict=True)
+emojiDictMaker(dumpTheDict=True)
