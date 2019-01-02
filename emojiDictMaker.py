@@ -163,4 +163,19 @@ def emojiDictMaker(dumpTheDict=False):
 	utilsOs.dumpDictToJsonFile(emojiNameDict, pathOutputFile=u'./emojiDict/emojiNameDict.json', overwrite=True)
 
 
-emojiDictMaker(dumpTheDict=True)
+def emojiHashtagDictMaker(emojiCharDictPath=u'./emojiDict/emojiCharDict.json'):
+	'''
+	given the emoji dict, makes a simple dict with key as hashtags and one emoji as value
+	'''
+	emojiHashtagDict = {}
+	emptyList = []
+	emojiCharDict = utilsOs.openJsonFileAsDict(emojiCharDictPath)
+	for emoji, valDict in emojiCharDict.items():
+		#avoid general or misleading categories
+		if valDict[u'category'] not in [u'people', u'symbols', u'flags']:
+			hashtagList = valDict[u'hashtags']
+			#populate the hashtag dict
+			for hashtag in hashtagList:
+				emojiHashtagDict[hashtag] = list(set( emojiHashtagDict.get(hashtag, list(emptyList)) + [emoji] ))
+	#dump the dicts to json files
+	utilsOs.dumpDictToJsonFile(emojiHashtagDict, pathOutputFile=u'./emojiDict/emojiHashtagDict.json', overwrite=True)

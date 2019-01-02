@@ -178,8 +178,7 @@ def convertJsonLineToDict(jsonFileStringLine):
 
 def dumpRawLines(listOfRawLines, filePath, addNewline=True, rewrite=True): 
 	'''
-	Dumps a list of raw lines in a a file 
-	so the Benchmark script can analyse the results
+	Dumps a list of raw lines in a file 
 	'''
 	folderPath = u'/'.join((filePath.split(u'/'))[:-1]+[''])
 	if not os.path.exists(folderPath):
@@ -197,6 +196,23 @@ def dumpRawLines(listOfRawLines, filePath, addNewline=True, rewrite=True):
 		else:
 			openedFile.write(u'%s' %(line))
 	openedFile.close()
+	return
+
+
+def dumpOneLineToExistingFile(line, filePath, addNewline=True, headerLine=None):
+	'''
+	dumps one lime into an existing file, if the file does not existsm then it's created
+	'''
+	if theFileExists(filePath) == False:
+		with codecs.open(filePath, u'w', encoding=u'utf8') as openedFile:
+			if headerLine != None:
+				openedFile.write(u'{0}\n'.format(headerLine))
+			else:
+				openedFile.write(u'')
+	with codecs.open(filePath, u'a', encoding=u'utf8') as openedFile:
+		if addNewline == True:
+			line = u'{0}\n'.format(line)
+			openedFile.write(line)
 	return
 
 
