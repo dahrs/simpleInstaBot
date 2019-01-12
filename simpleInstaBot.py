@@ -12,7 +12,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, InvalidSessionIdException
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, InvalidSessionIdException, MoveTargetOutOfBoundsException
 
 
 
@@ -42,7 +42,7 @@ def makeRandomComment(emojiHashtag=None, emojiHashtagDictPath=u'./emojiDict/emoj
 	'''	returns a random comment '''
 	#make the comment by associating from a set of lists at random
 	epithet = [u'Nice', u'Good', u'Cool', u'Awesome', u'Pretty nice', u'Pretty good', u'Pretty awesome']
-	nominal = [u'', u'', u' one', u' one', u' pic', u' pic', u' picture', u' picture', u' photo', u' photo', u' view', u' post', u' profile', u' account']
+	nominal = [u'', u'', u' one', u' one', u' pic', u' pic', u' picture', u' picture', u' photo', u' photo', u' post', u' profile', u' account']
 	punctuation = [u'', u'!']
 	comment = u'{0}{1}{2}'.format(epithet[random.randint(0, len(epithet)-1)], nominal[random.randint(0, len(nominal)-1)], punctuation[random.randint(0, len(punctuation)-1)])
 	#if there is an emoji hashtag, wee add it to the comment
@@ -267,6 +267,7 @@ def subscribe(profileDriver, instagramUsername=None, instagramPassword=None, out
 		if instagramUsername != None and instagramPassword != None:
 			profileDriver = logInInstagram(handleDriver, instagramUsername, instagramPassword)
 			profileDriver = posponeNotifications(handleDriver)
+		time.sleep(random.uniform(0.8, 1.3))
 		#open the profile page
 		profileDriver.get(profileUrl)
 	#get a popularity score (nb of followers / (followers+following+posts) )
@@ -302,6 +303,7 @@ def unsubscribe(profileDriver, instagramUsername=None, instagramPassword=None, o
 		if instagramUsername != None and instagramPassword != None:
 			profileDriver = logInInstagram(handleDriver, instagramUsername, instagramPassword)
 			profileDriver = posponeNotifications(handleDriver)
+		time.sleep(random.uniform(0.8, 1.3))
 		#open the profile page
 		profileDriver.get(profileUrl)
 	#get follow/unfollow button
@@ -435,23 +437,29 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 	#scroll a little to see the images
 	imageVerticalLocation = (picturesList[0].location)[u'y']
 	print(1111, imageVerticalLocation)
-	if imageVerticalLocation < 385:
+	if imageVerticalLocation < 395:
 		pass
 	elif imageVerticalLocation <= 650:
 		handleDriver.execute_script('window.scrollTo(0, document.body.scrollHeight/8);')
 	else:
 		handleDriver.execute_script('window.scrollTo(0, (document.body.scrollHeight/8)*2);')
-	time.sleep(random.uniform(0.5, 0.8))
 	#if there are no images immediately available
 	if len(picturesList) == 0:
 		handleDriver.close()
 		return handleDriver
-	#move mouse to the first image and click
-	action = webdriver.common.action_chains.ActionChains(handleDriver)
-	action.move_to_element_with_offset(picturesList[0], 5, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
-	action.click()
-	action.perform()
-	time.sleep(random.uniform(0.9, 1.3))
+	time.sleep(random.uniform(0.3, 0.5))
+	try:
+		#move mouse to the first image and click
+		action = webdriver.common.action_chains.ActionChains(handleDriver)
+		action.move_to_element_with_offset(picturesList[0], 65, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
+		action.click()
+		action.perform()
+		time.sleep(random.uniform(0.9, 1.3))
+	#if we overscroll, we close the window because getting it more right is a nightmare
+	except MoveTargetOutOfBoundsException:
+		#close the browser window
+		handleDriver.close()
+		return handleDriver
 	#like the first picture
 	totalLikes = clickHeartIfEmpty(handleDriver, '//article/div[2]/section[1]/span[1]/button', totalLikes=0)
 	#click to the next picture
@@ -540,15 +548,18 @@ def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashta
 					commentSection.send_keys(Keys.RETURN)
 					#like some of the pictures of that profile
 					profileHandleToLike = driver.find_element_by_xpath('//article/header/div[2]/div[1]/div[1]/h2/a').get_attribute(u'href')
-					if personalUserInfo != None:
+					#except if we already follow the profile
+					followingStatus = driver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button').text
+					if personalUserInfo != None and u'following' not in followingStatus.lower():
 						handleDriver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, random.randint(4, 24), followProfile=True)
-					try:
-						handleDriver.close()
-					except InvalidSessionIdException: pass
+						try:
+							handleDriver.close()
+						except InvalidSessionIdException: pass
 					time.sleep(random.uniform(0.8, 1.3))
 		#pass on the element if it's a video instead of a picture
 		except NoSuchElementException: 
 			pass
+		#if we had a problem closing the commented profile, try to close it again
 		except StaleElementReferenceException: 
 			try:
 				handleDriver.close()
@@ -572,10 +583,10 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword):
 	#first unsubscribe from profiles after one month
 	unsubscribeAfterOneMonth(instagramUsername, instagramPassword, u'./profilesBotFollowedBy{0}.tsv'.format(instagramUsername))
 	#then like the pictures followed
-	likePicsYouFollow(driver)
+	###likePicsYouFollow(driver, 7)
 	#verify that one hour has not passed yet
 	while actualTime < (startTime+1.0):
-		likeRandomPics(driver, likeLimit=random.randint(12, 21), hashtagWord=None)
+		###likeRandomPics(driver, likeLimit=random.randint(12, 21), hashtagWord=None)
 		likeAndCommentRandomPics(driver, likeLimit=random.randint(21, 52), hashtagWord=None, personalUserInfo=[instagramUsername, instagramPassword])
 		#get actual time before potentially starting over
 		actualTime = str(datetime.today()).split()[1].split(u':')
