@@ -226,6 +226,7 @@ def clickHeartIfEmpty(driver, xpathToHeart, totalLikes=0):
 		typeOfHeart = driver.find_element_by_xpath('{0}/span'.format(xpathToHeart))
 		#we only like if the heart is empty
 		if u'outline' in typeOfHeart.get_attribute('class'):
+			time.sleep(random.uniform(0.4, 0.9))
 			heart.click()
 			#one more like
 			totalLikes += 1
@@ -411,6 +412,14 @@ def likeRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None
 	return driver
 
 
+def likeAndSparselyCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None, maxLikeScore=None):
+	'''
+	makes a search and starts liking pics with the searched tag
+	if it finds a matching keyword in the pict's text, comment
+	'''
+	return driver
+
+
 def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHandleToLike, likeLimit=random.randint(8, 24), followProfile=True):
 	'''given a profile handle, it randomly likes some of the pictures'''
 
@@ -435,14 +444,17 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 	#list all pictures
 	picturesList = handleDriver.find_elements_by_class_name('eLAPa')
 	#scroll a little to see the images
+	time.sleep(random.uniform(0.5, 0.8))
 	imageVerticalLocation = (picturesList[0].location)[u'y']
 	print(1111, imageVerticalLocation)
-	if imageVerticalLocation < 395:
+	if imageVerticalLocation < 405:
 		pass
-	elif imageVerticalLocation <= 650:
+	elif imageVerticalLocation <= 450:	
+		handleDriver.execute_script('window.scrollTo(0, document.body.scrollHeight/10);')
+	elif imageVerticalLocation <= 700:
 		handleDriver.execute_script('window.scrollTo(0, document.body.scrollHeight/8);')
 	else:
-		handleDriver.execute_script('window.scrollTo(0, (document.body.scrollHeight/8)*2);')
+		handleDriver.execute_script('window.scrollTo(0, document.body.scrollHeight/4);')
 	#if there are no images immediately available
 	if len(picturesList) == 0:
 		handleDriver.close()
@@ -451,7 +463,7 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 	try:
 		#move mouse to the first image and click
 		action = webdriver.common.action_chains.ActionChains(handleDriver)
-		action.move_to_element_with_offset(picturesList[0], 65, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
+		action.move_to_element_with_offset(picturesList[0], 120, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
 		action.click()
 		action.perform()
 		time.sleep(random.uniform(0.9, 1.3))
@@ -591,7 +603,7 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword):
 		#get actual time before potentially starting over
 		actualTime = str(datetime.today()).split()[1].split(u':')
 		actualTime = float(u'{0}.{1}'.format(actualTime[0], actualTime[1]))
-
+	driver.close()
 
 
 ####################################################################################
