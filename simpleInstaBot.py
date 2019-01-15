@@ -611,19 +611,19 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword):
 ####################################################################################
 
 #open the browser window
-instagramUsername = 'the_vegetal_picture'
-instagramPassword = 'N0recuerd0'
+myData = utilsOs.openJsonFileAsDict(u'./keyAndPswrd.json') #place username and password in a file called keyAndPswrd.json in the following way: {"profile_name": "password"}
+for instagramUsername, instagramPassword in myData.items():
 
-driver = webdriver.Firefox()
-#log to instagram
-logInInstagram(driver, instagramUsername, instagramPassword)
-posponeNotifications(driver)
-time.sleep(1.0)
-####likePicsYouFollow(driver)
-####likeRandomPics(driver, likeLimit=5, hashtagWord=None)
-####likeAndCommentRandomPics(driver, likeLimit=5, hashtagWord=None, personalUserInfo=[instagramUsername, instagramPassword])
-oneHourOnAutoPilot(driver, instagramUsername, instagramPassword)
+	driver = webdriver.Firefox()
+	#log to instagram
+	logInInstagram(driver, instagramUsername, instagramPassword)
+	posponeNotifications(driver)
+	time.sleep(1.0)
+	####likePicsYouFollow(driver)
+	####likeRandomPics(driver, likeLimit=5, hashtagWord=None)
+	####likeAndCommentRandomPics(driver, likeLimit=5, hashtagWord=None, personalUserInfo=[instagramUsername, instagramPassword])
+	oneHourOnAutoPilot(driver, instagramUsername, instagramPassword)
 
 
-#close the browser window
-###driver.close()
+	#close the browser window
+	###driver.close()
