@@ -3,7 +3,7 @@
 
 
 import utilsOs
-import time, calendar, random, cv2, urllib.request
+import time, calendar, random, cv2, urllib.request, re
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -155,12 +155,14 @@ def getNextPic(driver):
 	for n in reversed(range(4)):
 		try:
 			nextPic = driver.find_element_by_xpath('//body/div[{0}]/div/div[1]/div/div/a[2]'.format(n))#click past the first popular picture
-			return nextPic
+			if nextPic.text == u'Next':
+				return nextPic
 		except NoSuchElementException:
 			#if there is no previous piconly next pic
 			try:
 				nextPic = driver.find_element_by_xpath('//body/div[{0}]/div/div[1]/div/div/a'.format(n))#click past the first popular picture
-				return nextPic
+				if nextPic.text == u'Next':
+					return nextPic
 			except NoSuchElementException: pass
 
 
@@ -169,9 +171,16 @@ def getExitButton(driver):
 	i = 1
 	for n in reversed(range(4)):
 		try:
-			exitButton = driver.find_element_by_xpath('//body/div[{0}]/div/button'.format(n))#click past the first popular picture
+			exitButton = driver.find_element_by_xpath('//body/div[{0}]/div/button'.format(n))			
 			return exitButton
-		except NoSuchElementException: pass
+		except NoSuchElementException:
+			pass
+	for n in reversed(range(4)):
+		for nb in reversed(range(4)):
+			try:
+				exitButton = driver.find_element_by_xpath('//body/div[{0}]/div/button[{1}]'.format(n, nb))
+			except NoSuchElementException:
+				pass
 
 
 def logInInstagram(logDriver, instagramUsername, instagramPassword):
@@ -205,6 +214,21 @@ def posponeNotifications(notifDriver):
 			pass
 
 
+def likeAndReplyToComments(driver, instagramUsername):
+	'''
+	goes through my posts, detect the new comments, likes and replies to them
+	'''
+	#get to the profile page
+	driver.get('https://www.instagram.com/{0}/'.format(instagramUsername))
+	#scroll to first image
+	driver, picturesList = scrollToFirstImage(driver)
+	#click on the first image
+	driver, picturesList = clickOnFirstImage(driver, picturesList)
+	######################################################
+	#find number of comments, identify origin of comments, like, comment and thank
+
+
+
 def instagramSearch(driver, hashtagWord):
 	'''
 	make a search in the instagram search page
@@ -219,7 +243,7 @@ def instagramSearch(driver, hashtagWord):
 	time.sleep(random.uniform(1.1, 1.9))
 	searchBar.send_keys(Keys.RETURN)
 	searchBar.send_keys(Keys.RETURN)
-	time.sleep(random.uniform(1.9, 2.4))
+	time.sleep(random.uniform(2.8, 4.4))
 	driver.refresh()
 	return driver
 
@@ -273,7 +297,7 @@ def commentIfAvailable(driver, comment):
 		commentSection = driver.find_element_by_xpath('//article/div[2]/section[3]/div/form/textarea') 				
 		time.sleep(random.uniform(0.6, 1.1))
 		commentSection.send_keys(comment)
-		time.sleep(random.uniform(0.8, 1.3))
+		time.sleep(random.uniform(0.3, 0.7)*len(comment))
 		commentSection.send_keys(Keys.RETURN)
 		commentSection.send_keys(Keys.RETURN)
 	return driver
@@ -287,7 +311,10 @@ def clickHeartIfEmptyAndCommentSparsely(driver, xpathToHeart, totalLikes=0, emoj
 	#get the emoji dict
 	emojiNameDict = utilsOs.openJsonFileAsDict(emojiCharDictPath)
 	#like the empty heart
-	heart = driver.find_element_by_xpath(xpathToHeart)
+	try:
+		heart = driver.find_element_by_xpath(xpathToHeart)
+	except NoSuchElementException:
+		return totalLikes
 	typeOfHeart = driver.find_element_by_xpath('{0}/span'.format(xpathToHeart))
 	#we only like if the heart is empty
 	if u'outline' in typeOfHeart.get_attribute('class'):
@@ -295,24 +322,25 @@ def clickHeartIfEmptyAndCommentSparsely(driver, xpathToHeart, totalLikes=0, emoj
 		heart.click()
 		#one more like
 		totalLikes += 1
-		#comment 2/3 of the liked
-		if random.randint(0, 2) != 0:
+		#comment 1/3 of the liked
+		if random.randint(0, 2) == 0:
 			#look if one of the emoji key words appear in the picture description
 			description = driver.find_element_by_xpath(u'//article/div[2]/div[1]/ul/li[1]/div/div/div/span').text.lower()
 			for emojiKeyword, emojiList in emojiNameDict.items():
 				#get the comment
 				listOfComments = [u'{0}{0}{0}'.format(emojiList[0]), u'{0}'.format(emojiList[0]), u'{0}!'.format(emojiList[0]), u'😮{0}'.format(emojiList[0]), u'😮, {0}'.format(emojiList[0]), u'👍{0}'.format(emojiList[0]), u'👌{0}'.format(emojiList[0]), u'🙃{0}'.format(emojiList[0])]
 				comment = listOfComments[ random.randint(0, len(listOfComments)-1) ]
+				#match to unwanted words
+				badEmoji = re.findall(r'angry|frown|sad|sob|confound|quiver|pouting|pain', emojiKeyword) 
 				#if we find a match
 				try:
-					if emojiKeyword in description and len(emojiKeyword) > 4:
+					if emojiKeyword in description and len(emojiKeyword) > 4 and len(badEmoji) == 0:
 						time.sleep(random.uniform(0.9, 1.3))
 						#comment using the emoji
 						driver = commentIfAvailable(driver, comment)
 						time.sleep(random.uniform(3.1, 4.5))
 						return totalLikes
 				except StaleElementReferenceException: 
-					print(33333333)
 					pass
 	return totalLikes
 
@@ -325,6 +353,7 @@ def getNbFromInstagramElement(textContent):
 	textContent = ( textContent.replace(u'posts', u'') ).replace(u'post', u'')
 	textContent = ( textContent.replace(u'followers', u'') ).replace(u'follower', u'')
 	textContent = ( textContent.replace(u'following', u'') ).replace(u',', u'')
+	textContent = ( textContent.replace(u'others', u'') ).replace(u'other', u'')
 	if u'k' in textContent:
 		textContent = ( textContent.replace(u'k', u'00') ).replace(u'.', u'')
 	if u'm' in textContent:
@@ -421,6 +450,41 @@ def unsubscribeAfterOneMonth(instagramUsername, instagramPassword, outputFilePat
 		unsubscribe(url, instagramUsername, instagramPassword, outputFilePath)
 
 
+def scrollToFirstImage(driver, picturesList=None):
+	''' based on the window heigh and the place of the 
+	first image, scroll till the first image is visible'''
+	if picturesList == None:
+		picturesList = driver.find_elements_by_class_name('eLAPa')
+	#scroll a little to see the images
+	time.sleep(random.uniform(0.5, 0.8))
+	imageVerticalLocation = (picturesList[0].location)[u'y']
+	#image location
+	if imageVerticalLocation < 405:
+		pass
+	elif imageVerticalLocation <= 450:	
+		driver.execute_script('window.scrollTo(0, document.body.scrollHeight/10);')
+	elif imageVerticalLocation <= 700:
+		driver.execute_script('window.scrollTo(0, document.body.scrollHeight/8);')
+	else:
+		driver.execute_script('window.scrollTo(0, document.body.scrollHeight/4);')
+	time.sleep(random.uniform(0.3, 0.5))
+	return driver, picturesList
+
+
+def clickOnFirstImage(driver, picturesList=None):
+	''' clicks ont the first picture of the list'''
+	if picturesList == None:
+		#list all pictures
+		picturesList = handleDriver.find_elements_by_class_name('eLAPa')
+	#move mouse to the first image and click
+	action = webdriver.common.action_chains.ActionChains(driver)
+	action.move_to_element_with_offset(picturesList[0], 120, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
+	action.click()
+	action.perform()
+	time.sleep(random.uniform(0.9, 1.3))
+	return driver, picturesList
+
+
 ####################################################################################
 #INSTABOT FUNCTIONS
 ####################################################################################
@@ -468,33 +532,46 @@ def likeRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None
 	action.perform()
 	#click pass the most popular pictures to the most recent pictures
 	nextPic = getNextPic(driver) #click past the first popular picture
-	nextPic.click()
-	time.sleep(random.uniform(0.8, 1.5))
-	#the xpath of the next button changes after the first picture
-	for i in range(8):
-		nextPic = getNextPic(driver)
+	#if there is a next picture
+	if nextPic != None:
 		nextPic.click()
 		time.sleep(random.uniform(0.8, 1.5))
-	#start liking 
-	totalLikes = 0
-	while totalLikes < likeLimit:
-		#we like exclusively the pictures having a low like score (unless we give no max like score limit)
-		try:
-			likeScore = getNbFromInstagramElement(driver.find_element_by_xpath(u'//article/div[2]/section[2]/div/div/button').text)#for pictures
-		except NoSuchElementException:
-			likeScore = getNbFromInstagramElement(driver.find_element_by_xpath(u'//article/div[2]/section[2]/div/span').text)#for videos
-		if maxLikeScore == None or likeScore < maxLikeScore:
-			#like
-			###totalLikes = clickHeartIfEmpty(driver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
-			totalLikes = clickHeartIfEmptyAndCommentSparsely(driver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
-		#click next
-		nextPic = getNextPic(driver)
-		nextPic.click()
-		time.sleep(random.uniform(0.9, 1.2))
+		#the xpath of the next button changes after the first picture
+		for i in range(8):
+			nextPic = getNextPic(driver)
+			#if there is a next picture
+			if nextPic != None:
+				nextPic.click()
+				time.sleep(random.uniform(0.8, 1.5))
+			else: return driver
+		#start liking 
+		totalLikes = 0
+		while totalLikes < likeLimit:
+			#we like exclusively the pictures having a low like score (unless we give no max like score limit)
+			try:
+				likeScore = getNbFromInstagramElement(driver.find_element_by_xpath(u'//article/div[2]/section[2]/div/div/button').text)#for pictures
+			except NoSuchElementException:
+				try:
+					likeScore = getNbFromInstagramElement(driver.find_element_by_xpath(u'//article/div[2]/section[2]/div/span').text)#for videos
+				except NoSuchElementException:
+					likeScore = 0
+			#if there is somebody we know that already liked the picture
+			except ValueError:
+				likeScore = getNbFromInstagramElement(driver.find_element_by_xpath(u'//article/div[2]/section[2]/div/div[2]/button').text)#for pictures
+			if maxLikeScore == None or likeScore < maxLikeScore:
+				#like
+				###totalLikes = clickHeartIfEmpty(driver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
+				totalLikes = clickHeartIfEmptyAndCommentSparsely(driver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
+			#click next
+			nextPic = getNextPic(driver)
+			#if there is a next picture
+			if nextPic != None:
+				nextPic.click()
+				time.sleep(random.uniform(0.9, 1.2))
 	return driver
 
 
-def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHandleToLike, likeLimit=random.randint(8, 24), followProfile=True):
+def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHandleToLike, likeLimit=random.randint(8, 24), followProfile=True, closeDriver=True):
 	'''given a profile handle, it randomly likes some of the pictures'''
 
 	#open a new browser window
@@ -517,30 +594,15 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 	popularityScore = float(followers) / float(followers+following+posts)
 	#list all pictures
 	picturesList = handleDriver.find_elements_by_class_name('eLAPa')
-	#scroll a little to see the images
-	time.sleep(random.uniform(0.5, 0.8))
-	imageVerticalLocation = (picturesList[0].location)[u'y']
-	#image location
-	if imageVerticalLocation < 405:
-		pass
-	elif imageVerticalLocation <= 450:	
-		handleDriver.execute_script('window.scrollTo(0, document.body.scrollHeight/10);')
-	elif imageVerticalLocation <= 700:
-		handleDriver.execute_script('window.scrollTo(0, document.body.scrollHeight/8);')
-	else:
-		handleDriver.execute_script('window.scrollTo(0, document.body.scrollHeight/4);')
 	#if there are no images immediately available
 	if len(picturesList) == 0:
 		handleDriver.close()
 		return handleDriver
-	time.sleep(random.uniform(0.3, 0.5))
+	#scroll a little to see the images
+	handleDriver = scrollToFirstImage(handleDriver, picturesList)
 	try:
 		#move mouse to the first image and click
-		action = webdriver.common.action_chains.ActionChains(handleDriver)
-		action.move_to_element_with_offset(picturesList[0], 120, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
-		action.click()
-		action.perform()
-		time.sleep(random.uniform(0.9, 1.3))
+		handleDriver = clickOnFirstImage(handleDriver, picturesList)
 	#if we overscroll, we close the window because getting it more right is a nightmare
 	except MoveTargetOutOfBoundsException:
 		#close the browser window
@@ -550,38 +612,43 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 	totalLikes = clickHeartIfEmpty(handleDriver, '//article/div[2]/section[1]/span[1]/button', totalLikes=0)
 	#click to the next picture
 	nextPic = getNextPic(handleDriver)#click past the first popular picture
-	nextPic.click()
-	time.sleep(random.uniform(0.8, 1.3))
-	#click and like randomly (2/3 of the pics) until we get to the like limit, the xpath of the next button changes after the first picture
-	while totalLikes < likeLimit:
-		#only like 2/3 of the pictures, not all of them
-		if random.randint(0,2) != 0:
-			###totalLikes = clickHeartIfEmpty(handleDriver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
-			totalLikes = clickHeartIfEmptyAndCommentSparsely(driver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
-			time.sleep(random.uniform(0.4, 0.8))
-		#go to the next picture
-		try:
+	#if there is a next picture
+	if nextPic != None:
+		nextPic.click()
+		time.sleep(random.uniform(0.8, 1.3))
+		#click and like randomly (2/3 of the pics) until we get to the like limit, the xpath of the next button changes after the first picture
+		while totalLikes < likeLimit:
+			#only like 2/3 of the pictures, not all of them
+			if random.randint(0,2) != 0:
+				###totalLikes = clickHeartIfEmpty(handleDriver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
+				totalLikes = clickHeartIfEmptyAndCommentSparsely(handleDriver, u'//article/div[2]/section[1]/span[1]/button', totalLikes)
+				time.sleep(random.uniform(0.4, 0.8))
+			#go to the next picture
 			nextPic = getNextPic(handleDriver)
-			nextPic.click()
-			time.sleep(random.uniform(0.8, 1.5))
-		#if there are no more pictures, stop the loop
-		except NoSuchElementException: 
+			#if there is a next picture
+			if nextPic != None:
+				nextPic.click()
+				time.sleep(random.uniform(0.8, 1.5))
+			#if there are no more pictures, stop the loop
 			totalLikes += 1
-	#lastly, we follow the profile (if specified) to show involvement
-	if followProfile == True:
-		followButton = handleDriver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button')
-		#if we don't follow them already
-		if u'following' not in (followButton.text).lower():
-			followButton.click()
-			#dump the info in a csv File
-			line = u'{0}\t{1}\t{2}\t{3}\t{4}'.format(instagramUsername, profileHandleToLike, popularityScore, str(datetime.today()).split()[0], str(datetime.today()).split()[1])
-			utilsOs.dumpOneLineToExistingFile(line, u'./profilesBotFollowedBy{0}.tsv'.format(instagramUsername), addNewline=True, headerLine=u'userName\thandleFollowed\tpopularityScore\tdate\ttime')
+		#lastly, we follow the profile (if specified) to show involvement
+		if followProfile == True:
+			followButton = handleDriver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button')
+			#if we don't follow them already
+			if u'following' not in (followButton.text).lower():
+				followButton.click()
+				#dump the info in a csv File
+				line = u'{0}\t{1}\t{2}\t{3}\t{4}'.format(instagramUsername, profileHandleToLike, popularityScore, str(datetime.today()).split()[0], str(datetime.today()).split()[1])
+				utilsOs.dumpOneLineToExistingFile(line, u'./profilesBotFollowedBy{0}.tsv'.format(instagramUsername), addNewline=True, headerLine=u'userName\thandleFollowed\tpopularityScore\tdate\ttime')
 	#close the image
 	exitButton = getExitButton(handleDriver)
-	exitButton.click()
-	#close the browser window
-	handleDriver.close()
-	return handleDriver
+	if exitButton != None:
+		exitButton.click()
+	if closeDriver == True:
+		time.sleep(random.uniform(1.0, 2.0))
+		handleDriver.close()
+		return None
+	else: return handleDriver
 
 
 def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None, personalUserInfo=None):
@@ -601,61 +668,71 @@ def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashta
 	action.perform()
 	#click pass the most popular pictures to the most recent pictures
 	nextPic = getNextPic(driver)
-	nextPic.click()
-	time.sleep(random.uniform(0.7, 1.1))
-	#click past the popular pictures, the xpath of the next button changes after the first picture
-	for i in range(8):
-		nextPic = getNextPic(driver)
+	#if there is a next picture
+	if nextPic != None:
 		nextPic.click()
-		time.sleep(random.uniform(0.8, 1.5))
-	#start liking and commenting
-	totalLikes = 0
-	while totalLikes < likeLimit:
-		#like it
-		totalLikes = clickHeartIfEmpty(driver, '//article/div[2]/section[1]/span[1]/button', totalLikes)
-		#get image url and image content description
-		try:
-			imageElement = driver.find_element_by_xpath('//article/div[1]/div/div/div[1]/img')
-			imageUrl = imageElement.get_attribute('src')
-			#we only comment on pictures containing no persons
-			imageContent = ( imageElement.get_attribute('alt').replace('Image may contain: ', '') ).split(', ')
-			if u'person' not in u' '.join(imageContent):
-				#comment it 
-				comment = makeRandomComment(emojiHashtag=hashtagWord)
-				#if there is a comment button (sometimes deactivated)
-				buttonType = driver.find_element_by_xpath('//article/div[2]/section[1]/span[2]/button/span')
-				if buttonType.get_attribute(u'aria-label') == u'Comment':
-					#click on the comment button
-					driver.find_element_by_xpath('//article/div[2]/section[1]/span[2]/button').click()
-					#get the comment section and comment
-					commentSection = driver.find_element_by_xpath('//article/div[2]/section[3]/div/form/textarea') 				
-					time.sleep(random.uniform(0.6, 1.1))
-					commentSection.send_keys(comment)
-					time.sleep(random.uniform(0.8, 1.3))
-					commentSection.send_keys(Keys.RETURN)
-					#like some of the pictures of that profile
-					profileHandleToLike = driver.find_element_by_xpath('//article/header/div[2]/div[1]/div[1]/h2/a').get_attribute(u'href')
-					#except if we already follow the profile
-					followingStatus = driver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button').text
-					if personalUserInfo != None and u'following' not in followingStatus.lower():
-						handleDriver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, random.randint(4, 24), followProfile=True)
-						try:
-							handleDriver.close()
-						except InvalidSessionIdException: pass
-					time.sleep(random.uniform(0.8, 1.3))
-		#pass on the element if it's a video instead of a picture
-		except NoSuchElementException: 
-			pass
-		#if we had a problem closing the commented profile, try to close it again
-		except StaleElementReferenceException: 
+		time.sleep(random.uniform(0.7, 1.1))
+		#click past the popular pictures, the xpath of the next button changes after the first picture
+		for i in range(8):
+			nextPic = getNextPic(driver)
+			#if there is a next picture
+			if nextPic != None:
+				nextPic.click()
+				time.sleep(random.uniform(0.8, 1.5))
+			else:
+				return driver
+		#start liking and commenting
+		totalLikes = 0
+		while totalLikes < likeLimit:
+			#like it
+			totalLikes = clickHeartIfEmpty(driver, '//article/div[2]/section[1]/span[1]/button', totalLikes)
+			#get image url and image content description
 			try:
-				handleDriver.close()
-			except Exception:
+				imageElement = driver.find_element_by_xpath('//article/div[1]/div/div/div[1]/img')
+				imageUrl = imageElement.get_attribute('src')
+				#we only comment on pictures containing no persons
+				imageContent = ( imageElement.get_attribute('alt').replace('Image may contain: ', '') ).split(', ')
+				if u'person' not in u' '.join(imageContent):
+					#comment it 
+					comment = makeRandomComment(emojiHashtag=hashtagWord)
+					#if there is a comment button (sometimes deactivated)
+					buttonType = driver.find_element_by_xpath('//article/div[2]/section[1]/span[2]/button/span')
+					if buttonType.get_attribute(u'aria-label') == u'Comment':
+						#click on the comment button
+						driver.find_element_by_xpath('//article/div[2]/section[1]/span[2]/button').click()
+						#get the comment section and comment
+						commentSection = driver.find_element_by_xpath('//article/div[2]/section[3]/div/form/textarea') 				
+						time.sleep(random.uniform(0.6, 1.1))
+						commentSection.send_keys(comment)
+						time.sleep(random.uniform(0.8, 1.3))
+						commentSection.send_keys(Keys.RETURN)
+						#like some of the pictures of that profile
+						profileHandleToLike = driver.find_element_by_xpath('//article/header/div[2]/div[1]/div[1]/h2/a').get_attribute(u'href')
+						#except if we already follow the profile
+						followingStatus = driver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button').text
+						if personalUserInfo != None and u'following' not in followingStatus.lower():
+							handleDriver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, random.randint(4, 24), followProfile=True, closeDriver=False)
+							try:
+								time.sleep(random.uniform(0.5, 1.0))
+								handleDriver.close()
+							except InvalidSessionIdException: 
+								print(111111111111111, 'invalid session id')
+						time.sleep(random.uniform(0.8, 1.3))
+			#pass on the element if it's a video instead of a picture
+			except NoSuchElementException: 
 				pass
-		#click next
-		nextPic = getNextPic(driver)
-		nextPic.click()
-		time.sleep(random.uniform(0.8, 1.3))
+			#if we had a problem closing the commented profile, try to close it again
+			except StaleElementReferenceException: 
+				try:
+					handleDriver.close()
+				except Exception:
+					pass
+			#click next
+			nextPic = getNextPic(driver)
+			#if there is a next picture
+			if nextPic != None:
+				nextPic.click()
+				time.sleep(random.uniform(0.8, 1.3))
 	return driver
 	
 
@@ -670,7 +747,7 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword):
 	#first unsubscribe from profiles after one month
 	unsubscribeAfterOneMonth(instagramUsername, instagramPassword, u'./profilesBotFollowedBy{0}.tsv'.format(instagramUsername))
 	#then like the pictures followed
-	###likePicsYouFollow(driver, 7)
+	driver = likePicsYouFollow(driver, 7)
 	#verify that one hour has not passed yet
 	while actualTime < (startTime+1.0):
 		likeRandomPics(driver, likeLimit=random.randint(12, 21), hashtagWord=None)
