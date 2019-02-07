@@ -154,13 +154,15 @@ def getNextPic(driver):
 	i = 1
 	for n in reversed(range(4)):
 		try:
-			nextPic = driver.find_element_by_xpath('//body/div[{0}]/div/div[1]/div/div/a[2]'.format(n))#click past the first popular picture
+			#click past the first popular picture
+			nextPic = driver.find_element_by_xpath(u'//body/div[{0}]/div[1]/div/div/a[2]'.format(n)) #'//body/div[{0}]/div/div[1]/div/div/a[2]'
 			if nextPic.text == u'Next':
 				return nextPic
 		except NoSuchElementException:
-			#if there is no previous piconly next pic
+			#if there is no previous pic only next pic
 			try:
-				nextPic = driver.find_element_by_xpath('//body/div[{0}]/div/div[1]/div/div/a'.format(n))#click past the first popular picture
+				#click past the first popular picture
+				nextPic = driver.find_element_by_xpath(u'//body/div[{0}]/div[1]/div/div/a'.format(n)) #'//body/div[{0}]/div/div[1]/div/div/a'
 				if nextPic.text == u'Next':
 					return nextPic
 			except NoSuchElementException: pass
@@ -211,7 +213,7 @@ def posponeNotifications(notifDriver):
 			notifDriver.find_element_by_xpath('//body/div[{0}]/div/div/div/div[3]/button[2]'.format(n)).click()
 			return notifDriver
 		except NoSuchElementException:
-			pass
+			return notifDriver
 
 
 def likeAndReplyToComments(driver, instagramUsername):
@@ -400,6 +402,7 @@ def subscribe(profileDriver, instagramUsername=None, instagramPassword=None, out
 
 def unsubscribe(profileDriver, instagramUsername=None, instagramPassword=None, outputFilePath=None):
 	''' unfollows a profile, given an instagram driver or profile url '''
+	toBeUnfollowed = False
 	#following
 	if type(profileDriver) is str:
 		#get the url
@@ -412,31 +415,46 @@ def unsubscribe(profileDriver, instagramUsername=None, instagramPassword=None, o
 			profileUrl = u'https://www.instagram.com/{0}/'.format(profileUrl)
 		#log to instagram
 		if instagramUsername != None and instagramPassword != None:
-			profileDriver = logInInstagram(handleDriver, instagramUsername, instagramPassword)
-			profileDriver = posponeNotifications(handleDriver)
+			profileDriver = logInInstagram(profileDriver, instagramUsername, instagramPassword)
+			profileDriver = posponeNotifications(profileDriver)
 		time.sleep(random.uniform(0.8, 1.3))
 		#open the profile page
 		profileDriver.get(profileUrl)
 	#get follow/unfollow button
-	followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/span/span[1]/button')
-	#if we don't follow them already
-	if u'following' in (followButton.text).lower():
-		followButton.click()
-		#remove row from the csv File
-		if outputFilePath != None:
-			#get df
-			followingDf = pd.read_csv(outputFilePath, sep=u'\t')
-			#get rid of the row
-			followingDf = followingDf.loc[~followingDf[u'handleFollowed'] == profileUrl]
-			#dump to file
-			followingDf.to_csv(outputFilePath, sep='\t', index=False)
-	return profileDriver
+	try:
+		followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/span/span[1]/button')
+		#if we don't follow them already
+		if u'following' in (followButton.text).lower():
+			followButton.click()
+			verificationFollowButton = profileDriver.find_element_by_xpath('//body/div[2]/div/div/div[3]/button[1]') #'//body/div[2]/div/div/div/div[3]/button[1]'
+			time.sleep(random.uniform(0.4, 1.0))
+			verificationFollowButton.click()		
+			time.sleep(random.uniform(0.7, 0.9))
+			toBeUnfollowed = True
+	except NoSuchElementException:
+		#if instagram excuses itself the profile was probably erased, if not, wue got to see what hapens so we raise the same exception
+		if u'Sorry' not in profileDriver.find_element_by_xpath('//body/div/div[1]/div/div/h2').text:
+			raise NoSuchElementException
+		toBeUnfollowed = True
+	#remove row from the csv File if we successfully unfollowed or if the profile doesn't exist anymore
+	if outputFilePath != None and toBeUnfollowed == True:
+		#get df
+		followingDf = pd.read_csv(outputFilePath, sep=u'\t')
+		#get rid of the row
+		followingDf = followingDf.loc[~followingDf[u'handleFollowed'].isin([profileUrl])]
+		#dump to file
+		followingDf.to_csv(outputFilePath, sep='\t', index=False)
+	profileDriver.close()
 
 
 def unsubscribeAfterOneMonth(instagramUsername, instagramPassword, outputFilePath):
 	''' unsubscribes one month old profiles '''
-	#get df
-	followingDf = pd.read_csv(outputFilePath, sep=u'\t')
+	try:
+		#get df
+		followingDf = pd.read_csv(outputFilePath, sep=u'\t')
+	#if there is no file
+	except FileNotFoundError:
+		return None
 	#get list of people to unsubscribe
 	tempDf = followingDf
 	tempDf[u'date'] = tempDf[u'date'].apply(addMonthsToDate)
@@ -489,6 +507,11 @@ def clickOnFirstImage(driver, picturesList=None):
 #INSTABOT FUNCTIONS
 ####################################################################################
 
+def thank4Comments():
+	''' from home page, looks at the comments in 
+	profile's pictures and thanks for them '''
+
+
 def likePicsYouFollow(driver, likeLimit=random.randint(7, 41), goToHomePage=False):
 	'''
 	from your home page, start liking the 
@@ -530,6 +553,7 @@ def likeRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None
 	action.move_to_element_with_offset(picturesLink[0], 5, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
 	action.click()
 	action.perform()
+	time.sleep(random.uniform(0.7, 1.1))
 	#click pass the most popular pictures to the most recent pictures
 	nextPic = getNextPic(driver) #click past the first popular picture
 	#if there is a next picture
@@ -599,10 +623,10 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 		handleDriver.close()
 		return handleDriver
 	#scroll a little to see the images
-	handleDriver = scrollToFirstImage(handleDriver, picturesList)
+	handleDriver, picturesList = scrollToFirstImage(handleDriver, picturesList)
 	try:
 		#move mouse to the first image and click
-		handleDriver = clickOnFirstImage(handleDriver, picturesList)
+		handleDriver, picturesList = clickOnFirstImage(handleDriver, picturesList)
 	#if we overscroll, we close the window because getting it more right is a nightmare
 	except MoveTargetOutOfBoundsException:
 		#close the browser window
@@ -747,7 +771,7 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword):
 	#first unsubscribe from profiles after one month
 	unsubscribeAfterOneMonth(instagramUsername, instagramPassword, u'./profilesBotFollowedBy{0}.tsv'.format(instagramUsername))
 	#then like the pictures followed
-	driver = likePicsYouFollow(driver, 7)
+	driver = likePicsYouFollow(driver, 7) ########################################
 	#verify that one hour has not passed yet
 	while actualTime < (startTime+1.0):
 		likeRandomPics(driver, likeLimit=random.randint(12, 21), hashtagWord=None)
