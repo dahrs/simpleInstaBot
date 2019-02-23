@@ -173,15 +173,24 @@ def getExitButton(driver):
 	i = 1
 	for n in reversed(range(4)):
 		try:
-			exitButton = driver.find_element_by_xpath('//body/div[{0}]/div/button'.format(n))			
-			return exitButton
+			exitButton = driver.find_element_by_xpath('//body/div[{0}]/div/button'.format(n))
+			if u'Close' in exitButton.text:		
+				return exitButton
 		except NoSuchElementException:
 			pass
 	for n in reversed(range(4)):
 		for nb in reversed(range(4)):
 			try:
 				exitButton = driver.find_element_by_xpath('//body/div[{0}]/div/button[{1}]'.format(n, nb))
+				if u'Close' in exitButton.text:
+					return exitButton
 			except NoSuchElementException:
+				try:
+					exitButton = driver.find_element_by_xpath('//body/div[{0}]/button[{1}]'.format(n, nb))
+					if u'Close' in exitButton.text:
+						return exitButton
+				except NoSuchElementException:
+					pass
 				pass
 
 
@@ -189,14 +198,26 @@ def logInInstagram(logDriver, instagramUsername, instagramPassword):
 	'''
 	opens the login page of instagram and logs in
 	'''
-	logDriver.get('https://www.instagram.com/accounts/login/')
+	logDriver.get(u'https://www.instagram.com/accounts/login/')
 	time.sleep(random.uniform(1.1, 2.3))
 	#username
-	userName = logDriver.find_element_by_xpath('//article/div/div/div/form/div/div/div/input')
+	for nb in range(1, 10):
+		usernamePath = u'//article/div/div[1]/div/form/div[{0}]/div/div[1]/'.format(nb)
+		userName = logDriver.find_element_by_xpath(u'{0}input'.format(usernamePath)) #u'//article/div/div/div/form/div/div/div/input'
+		label = logDriver.find_element_by_xpath(u'{0}label'.format(usernamePath)).text
+		if u'username' in label:
+			break
+	for nb in range(1, 10):
+		#password
+		passwordPath = u'//article/div/div[1]/div/form/div[{0}]/div/div[1]/'.format(nb)
+		password = logDriver.find_element_by_xpath(u'{0}input'.format(passwordPath)) #u'//article/div/div/div/form/div[2]/div/div/input'
+		label = logDriver.find_element_by_xpath(u'{0}label'.format(passwordPath)).text
+		if u'Password' in label:
+			break
 	userName.send_keys(instagramUsername)
-	#password
-	password = logDriver.find_element_by_xpath('//article/div/div/div/form/div[2]/div/div/input') 
+	time.sleep(random.uniform(1.8, 3.4))
 	password.send_keys(instagramPassword)
+	time.sleep(random.uniform(1.1, 3.0))
 	#find element
 	logDriver.find_element_by_xpath('//article/div/div/div/form/div[3]/button').click()
 	return logDriver
@@ -211,9 +232,14 @@ def posponeNotifications(notifDriver):
 			time.sleep(random.uniform(2.1, 3.4))
 			#driver.find_element_by_xpath('//body/div[2]/div/div/div/div[3]/button[2]').click()
 			notifDriver.find_element_by_xpath('//body/div[{0}]/div/div/div/div[3]/button[2]'.format(n)).click()
-			return notifDriver
+			break
 		except NoSuchElementException:
-			return notifDriver
+			try:
+				notifDriver.find_element_by_xpath('//body/div[{0}]/div/div/div[3]/button[2]'.format(n)).click()
+				break
+			except NoSuchElementException:
+				pass
+	return notifDriver
 
 
 def likeAndReplyToComments(driver, instagramUsername):
@@ -389,7 +415,10 @@ def subscribe(profileDriver, instagramUsername=None, instagramPassword=None, out
 	following = int( getNbFromInstagramElement(handleDriver.find_element_by_xpath('//header/section/ul/li[3]/a/span').text) )
 	popularityScore = float(followers) / float(followers+following+posts)
 	#get follow/unfollow button
-	followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/span/span[1]/button')
+	try:
+		followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/button')
+	except NoSuchElementException:
+		followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/span/span[1]/button')
 	#if we don't follow them already
 	if u'following' not in (followButton.text).lower():
 		followButton.click()
@@ -400,29 +429,30 @@ def subscribe(profileDriver, instagramUsername=None, instagramPassword=None, out
 	return profileDriver
 
 
-def unsubscribe(profileDriver, instagramUsername=None, instagramPassword=None, outputFilePath=None):
+def unsubscribe(profileUrl, profileDriver=None, instagramUsername=None, instagramPassword=None, outputFilePath=None, closeAfterwards=True):
 	''' unfollows a profile, given an instagram driver or profile url '''
-	toBeUnfollowed = False
+	#make sure we have the profile url, not only the profile name
+	if u'www.instagram.com' not in profileUrl:
+		profileUrl = profileUrl.replace(u'@', u'').replace(u'/', u'').replace(u' ', u'_')
+		profileUrl = u'https://www.instagram.com/{0}/'.format(profileUrl)
 	#following
-	if type(profileDriver) is str:
-		#get the url
-		profileUrl = profileDriver
+	if profileDriver == None:
 		#open a new browser window
 		profileDriver = webdriver.Firefox()
-		#make sure we have the profile url, not only the profile name
-		if u'www.instagram.com' not in profileUrl:
-			profileUrl = profileUrl.replace(u'@', u'').replace(u'/', u'').replace(u' ', u'_')
-			profileUrl = u'https://www.instagram.com/{0}/'.format(profileUrl)
-		#log to instagram
+		#log to instagram if needed
 		if instagramUsername != None and instagramPassword != None:
 			profileDriver = logInInstagram(profileDriver, instagramUsername, instagramPassword)
 			profileDriver = posponeNotifications(profileDriver)
-		time.sleep(random.uniform(0.8, 1.3))
-		#open the profile page
-		profileDriver.get(profileUrl)
+	time.sleep(random.uniform(1.6, 2.0))
+	#open the profile page
+	profileDriver.get(profileUrl)
 	#get follow/unfollow button
 	try:
-		followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/span/span[1]/button')
+		#select follow button
+		try:
+			followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/span/span[1]/button')
+		except NoSuchElementException:
+			followButton = profileDriver.find_element_by_xpath('//header/section/div[1]/button')
 		#if we don't follow them already
 		if u'following' in (followButton.text).lower():
 			followButton.click()
@@ -430,21 +460,23 @@ def unsubscribe(profileDriver, instagramUsername=None, instagramPassword=None, o
 			time.sleep(random.uniform(0.4, 1.0))
 			verificationFollowButton.click()		
 			time.sleep(random.uniform(0.7, 0.9))
-			toBeUnfollowed = True
 	except NoSuchElementException:
 		#if instagram excuses itself the profile was probably erased, if not, wue got to see what hapens so we raise the same exception
 		if u'Sorry' not in profileDriver.find_element_by_xpath('//body/div/div[1]/div/div/h2').text:
 			raise NoSuchElementException
-		toBeUnfollowed = True
 	#remove row from the csv File if we successfully unfollowed or if the profile doesn't exist anymore
-	if outputFilePath != None and toBeUnfollowed == True:
+	if outputFilePath != None:
 		#get df
 		followingDf = pd.read_csv(outputFilePath, sep=u'\t')
 		#get rid of the row
 		followingDf = followingDf.loc[~followingDf[u'handleFollowed'].isin([profileUrl])]
 		#dump to file
 		followingDf.to_csv(outputFilePath, sep='\t', index=False)
-	profileDriver.close()
+	#either close the browser or return the browser handle
+	if closeAfterwards == True:
+		profileDriver.close()
+	else:
+		return profileDriver
 
 
 def unsubscribeAfterOneMonth(instagramUsername, instagramPassword, outputFilePath):
@@ -463,9 +495,20 @@ def unsubscribeAfterOneMonth(instagramUsername, instagramPassword, outputFilePat
 	#make a list of the urls to unsubscribe
 	urlsToUnfollow = tempDf[u'handleFollowed'].tolist()
 	#go online and actually unsubscribe
-	for url in urlsToUnfollow:
+	profileDriver = None
+	for index, url in enumerate(urlsToUnfollow):
 		#unsubscribe (it will also remove the row from the tsv list one by onem after being sure we unsubscribed without any problem)
-		unsubscribe(url, instagramUsername, instagramPassword, outputFilePath)
+		if profileDriver == None:
+			profileDriver = unsubscribe(url, profileDriver, instagramUsername, instagramPassword, outputFilePath, closeAfterwards=False)
+		else:
+			#do not close the profile drive if it's not the last
+			if index+1 < len(urlsToUnfollow):
+				profileDriver = unsubscribe(url, profileDriver, instagramUsername, instagramPassword, outputFilePath, closeAfterwards=False)
+			#close if it's the last
+			else:
+				profileDriver = unsubscribe(url, profileDriver, instagramUsername, instagramPassword, outputFilePath, closeAfterwards=True)
+	if profileDriver != None:
+		profileDriver.close()
 
 
 def scrollToFirstImage(driver, picturesList=None):
@@ -668,6 +711,9 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 	exitButton = getExitButton(handleDriver)
 	if exitButton != None:
 		exitButton.click()
+	else:
+		handleDriver.close()
+		return None
 	if closeDriver == True:
 		time.sleep(random.uniform(1.0, 2.0))
 		handleDriver.close()
@@ -736,14 +782,14 @@ def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashta
 						followingStatus = driver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button').text
 						if personalUserInfo != None and u'following' not in followingStatus.lower():
 							handleDriver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, random.randint(4, 24), followProfile=True, closeDriver=False)
-							try:
+							if handleDriver != None:
 								time.sleep(random.uniform(0.5, 1.0))
 								handleDriver.close()
-							except InvalidSessionIdException: 
-								print(111111111111111, 'invalid session id')
+							###except InvalidSessionIdException: 
+							###	print(111111111111111, 'invalid session id')
 						time.sleep(random.uniform(0.8, 1.3))
 			#pass on the element if it's a video instead of a picture
-			except NoSuchElementException: 
+			except NoSuchElementException:
 				pass
 			#if we had a problem closing the commented profile, try to close it again
 			except StaleElementReferenceException: 
@@ -788,8 +834,8 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword):
 
 #open the browser window
 myData = utilsOs.openJsonFileAsDict(u'./keyAndPswrd.json') #place username and password in a file called keyAndPswrd.json in the following way: {"profile_name": "password"}
-for instagramUsername, instagramPassword in myData.items():
 
+for instagramUsername, instagramPassword in myData.items():
 	driver = webdriver.Firefox()
 	#log to instagram
 	logInInstagram(driver, instagramUsername, instagramPassword)
