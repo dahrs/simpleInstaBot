@@ -168,6 +168,7 @@ def getNextPic(driver):
 				if nextPic.text == u'Next':
 					return nextPic
 			except NoSuchElementException: pass
+	return None
 
 
 def getExitButton(driver):
@@ -491,7 +492,7 @@ def unsubscribe(profileUrl, profileDriver=None, instagramUsername=None, instagra
 
 def unsubscribeAfterOneMonth(instagramUsername, instagramPassword, outputFilePath, profileDriver=None):
 	''' unsubscribes one month old profiles '''
-	closeDriver = True if profileDriver == None else False
+	closeAfterwards = True if profileDriver == None else False
 	try:
 		#get df
 		followingDf = pd.read_csv(outputFilePath, sep=u'\t')
@@ -516,8 +517,8 @@ def unsubscribeAfterOneMonth(instagramUsername, instagramPassword, outputFilePat
 				profileDriver = unsubscribe(url, profileDriver, instagramUsername, instagramPassword, outputFilePath, closeAfterwards=False)
 			#close if it's the last
 			else:
-				profileDriver = unsubscribe(url, profileDriver, instagramUsername, instagramPassword, outputFilePath, closeAfterwards=True)
-	if closeDriver == True:
+				profileDriver = unsubscribe(url, profileDriver, instagramUsername, instagramPassword, outputFilePath, closeAfterwards=closeAfterwards)
+	if closeAfterwards == True:
 		profileDriver.close()
 	else:
 		return profileDriver
@@ -621,7 +622,10 @@ def likeRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None
 		for i in range(8):
 			nextPic = getNextPic(driver)
 			#get a list of hashtags from the popular pictures
-			picDescription = driver.find_element_by_xpath('//article/div[2]/div[1]/ul/li/div/div/div/span').text
+			try:
+				picDescription = driver.find_element_by_xpath('//article/div[2]/div[1]/ul/li/div/div/div[2]/span').text
+			except NoSuchElementException:
+				picDescription = driver.find_element_by_xpath('//article/div[2]/div[1]/ul/li/div/div/div/span').text
 			picDescription = picDescription.replace(u'\n', u' ').replace(u'\r', u' ').replace(u'\t', u' ')
 			hashtags = [ tok for tok in picDescription.split(u' ') if tok != '']
 			hashtags = [ tok for tok in hashtags if tok[0] == '#' ]
@@ -659,7 +663,8 @@ def likeRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None
 	return driver, popularPicsHahstags
 
 
-def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHandleToLike, handleDriver=None, likeLimit=random.randint(8, 24), followProfile=True):
+def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHandleToLike, 
+	handleDriver=None, likeLimit=random.randint(8, 24), followProfile=True, closeDriver=True):
 	'''given a profile handle, it randomly likes some of the pictures'''
 	if handleDriver == None:
 		#open a new browser window
@@ -671,9 +676,6 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 		#log to instagram
 		handleDriver = logInInstagram(handleDriver, instagramUsername, instagramPassword)
 		handleDriver = posponeNotifications(handleDriver)
-		closeDriver = True
-	else:
-		closeDriver = False
 	time.sleep(random.uniform(1.0, 1.5))
 	#open the profile page
 	handleDriver.get(profileHandleToLike)
@@ -811,7 +813,7 @@ def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashta
 						#except if we already follow the profile
 						followingStatus = driver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button').text
 						if personalUserInfo != None and u'following' not in followingStatus.lower():
-							driver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, driver, random.randint(4, 24), followProfile=True)
+							driver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, driver, random.randint(4, 24), followProfile=True, closeDriver=False)
 							driver.get(imageSearchPage)
 							#scroll to first image
 							driver, picturesList = scrollToFirstImage(driver)
@@ -857,7 +859,7 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePref
 	driver = likePicsYouFollow(driver, 7) ########################################
 	popularPicsHahstags = list(profilePreferedHashtags)
 	#verify that one hour has not passed yet
-	while actualTime < (startTime+0.0):
+	while actualTime < (startTime+1.0):
 		#get a random index to get a random hashtag
 		randomIndex = random.randint(0, len(popularPicsHahstags)-1)
 		driver, popularPicsHahstags = likeRandomPics(driver, 
