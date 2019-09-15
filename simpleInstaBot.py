@@ -228,6 +228,7 @@ def posponeNotifications(notifDriver):
 	'''
 	if it finds a notifications button, it clicks on 'Not Now'
 	'''
+	time.sleep(random.uniform(0.9, 1.8))
 	for n in reversed(range(4)):
 		try:
 			time.sleep(random.uniform(2.1, 3.4))
@@ -261,6 +262,8 @@ def instagramSearch(driver, hashtagWord):
 	'''
 	make a search in the instagram search page
 	'''
+	if hashtagWord in [u'', u'\n', u'\t', u' ']:
+		hashtagWord = u'#awesome'
 	if hashtagWord[0] == u'#':
 		hashtagWord = hashtagWord[1:]
 	#get to the search page
@@ -358,7 +361,10 @@ def clickHeartIfEmptyAndCommentSparsely(driver, xpathToHeart, totalLikes=0, emoj
 			try:
 				description = driver.find_element_by_xpath(u'//article/div[2]/div[1]/ul/li[1]/div/div/div/span').text.lower()
 			except NoSuchElementException:
-				description = driver.find_element_by_xpath(u'//article/div[2]/div[1]/ul/ul/li/div/div[1]/div[2]/span').text.lower()														
+				try:
+					description = driver.find_element_by_xpath(u'//article/div[2]/div[1]/ul/ul/li/div/div[1]/div[2]/span').text.lower()
+				except NoSuchElementException:
+					description = driver.find_element_by_xpath(u'//article/div[2]/div[1]/ul/div/li/div/div/div[2]/span').text.lower()											
 			for emojiKeyword, emojiList in emojiNameDict.items():
 				#get the comment
 				listOfComments = [u'{0}{0}{0}'.format(emojiList[0]), u'{0}'.format(emojiList[0]), u'{0}!'.format(emojiList[0]), u'😮{0}'.format(emojiList[0]), u'😮, {0}'.format(emojiList[0]), u'👍{0}'.format(emojiList[0]), u'👌{0}'.format(emojiList[0]), u'🙃{0}'.format(emojiList[0])]
@@ -636,13 +642,22 @@ def likeRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None
 			try:
 				picDescription = driver.find_element_by_xpath('//article/div[2]/div[1]/ul/li/div/div/div[2]/span').text
 			except NoSuchElementException:
-				time.sleep(random.uniform(4.2, 7.0))
-				picDescription = driver.find_element_by_xpath('//article/div[2]/div[1]/ul/li/div/div/div/span').text
-			picDescription = picDescription.replace(u'\n', u' ').replace(u'\r', u' ').replace(u'\t', u' ')
-			hashtags = [ tok for tok in picDescription.split(u' ') if tok != '']
-			hashtags = [ tok for tok in hashtags if tok[0] == '#' ]
-			for hasht in hashtags:
-				popularPicsHahstags.append(hasht)
+				try:
+					time.sleep(random.uniform(1.6, 3.5))
+					picDescription = driver.find_element_by_xpath('//article/div[2]/div[1]/ul/li/div/div/div/span').text
+				except NoSuchElementException:
+					try:
+						time.sleep(random.uniform(4.2, 7.0))
+						picDescription = driver.find_element_by_xpath('//article/div[2]/div[1]/ul/div/li/div/div/div[2]/span').text
+					except NoSuchElementException:
+						picDescription = None
+			# extract the hashtags																
+			if picDescription != None:
+				picDescription = picDescription.replace(u'\n', u' ').replace(u'\r', u' ').replace(u'\t', u' ')
+				hashtags = [ tok for tok in picDescription.split(u' ') if tok != '']
+				hashtags = [ tok for tok in hashtags if tok[0] == '#' ]
+				for hasht in hashtags:
+					popularPicsHahstags.append(hasht)
 			#if there is a next picture
 			if nextPic != None:
 				nextPic.click()
@@ -758,7 +773,7 @@ def likeRandomPicsInOneProfile(instagramUsername, instagramPassword, profileHand
 	else: return handleDriver
 
 
-def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None, personalUserInfo=None, whereWeLeftOf=None):
+def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashtagWord=None, personalUserInfo=None, whereWeLeftOf=None, followProfiles=True):
 	'''
 	makes a search and starts liking pics with the searched tag
 	'''
@@ -774,7 +789,10 @@ def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashta
 		whereWeLeftOf = 10
 	#click on the first picture
 	action = webdriver.common.action_chains.ActionChains(driver)
-	action.move_to_element_with_offset(driver.find_element_by_class_name('eLAPa'), 5, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
+	try:
+		action.move_to_element_with_offset(driver.find_element_by_class_name('eLAPa'), 5, 6) #move cursor to 5 pixels down the top left corner and 6 pixels to the right of the top left corner
+	except selenium.common.exceptions.NoSuchElementException:
+		return driver, whereWeLeftOf
 	action.click()
 	action.perform()
 	#click pass the most popular pictures to the most recent pictures
@@ -826,7 +844,7 @@ def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashta
 						#except if we already follow the profile
 						followingStatus = driver.find_element_by_xpath('//header/div[2]/div[1]/div[2]/button').text
 						if personalUserInfo != None and u'following' not in followingStatus.lower():
-							driver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, driver, random.randint(4, 24), followProfile=True, closeDriver=False)
+							driver = likeRandomPicsInOneProfile(personalUserInfo[0], personalUserInfo[1], profileHandleToLike, driver, random.randint(4, 24), followProfile=followProfiles, closeDriver=False)
 							driver.get(imageSearchPage)
 							#scroll to first image
 							driver, picturesList = scrollToFirstImage(driver)
@@ -857,7 +875,7 @@ def likeAndCommentRandomPics(driver, likeLimit=random.randint(850, 1045), hashta
 	return driver, whereWeLeftOf
 	
 
-def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePreferedHashtags):
+def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePreferedHashtags, followProfiles=True):
 	'''
 	likes, comments and follows for at least one hour
 	'''
@@ -880,7 +898,7 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePref
 		randomIndex = random.randint(0, len(popularPicsHahstags)-1)
 		print(7777777, randomIndex, popularPicsHahstags[randomIndex])
 		driver, popularPicsHahstags = likeRandomPics(driver, 
-			likeLimit=random.randint(12, 21), 
+			likeLimit=random.randint(7, 10), 
 			hashtagWord=popularPicsHahstags[randomIndex], 
 			popularPicsHahstags=popularPicsHahstags)
 		#delete the hashtag we just used
@@ -892,7 +910,7 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePref
 			likeLimit=random.randint(21, 52), 
 			hashtagWord=popularPicsHahstags[randomIndex], 
 			personalUserInfo=[instagramUsername, instagramPassword], 
-			whereWeLeftOf=whereWeLeftOf)
+			whereWeLeftOf=whereWeLeftOf, followProfiles=followProfiles)
 		#delete the hashtag we just used
 		del popularPicsHahstags[randomIndex]
 		#get actual time before potentially starting over
@@ -907,6 +925,9 @@ def oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePref
 
 #open the browser window
 myData = utilsOs.openJsonFileAsDict(u'./keyAndPswrd.json') #place username and password in a file called keyAndPswrd.json in the following way: {"profile_name": "password"}
+myDataTemp = {}
+myDataTemp["dahrs_"] = myData["dahrs_"]
+myData = myDataTemp
 
 for instagramUsername, instagramData in myData.items():
 	instagramPassword = instagramData[0]
@@ -917,4 +938,4 @@ for instagramUsername, instagramData in myData.items():
 	logInInstagram(driver, instagramUsername, instagramPassword)
 	posponeNotifications(driver)
 	time.sleep(1.0)
-	oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePreferedHashtags)
+	oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePreferedHashtags, followProfiles=False)
