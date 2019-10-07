@@ -929,13 +929,20 @@ myDataTemp = {}
 myDataTemp["dahrs_"] = myData["dahrs_"]
 myData = myDataTemp
 
-for instagramUsername, instagramData in myData.items():
-	instagramPassword = instagramData[0]
-	profilePreferedHashtags = instagramData[1]
-	print(10000, instagramUsername)
-	driver = webdriver.Firefox()
-	#log to instagram
-	logInInstagram(driver, instagramUsername, instagramPassword)
-	posponeNotifications(driver)
-	time.sleep(1.0)
-	oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePreferedHashtags, followProfiles=False)
+while True:
+	# get current date
+	now = datetime.now()
+	# run the script if it's during the hours of interest
+	if now.hour in [1, 2, 7, 8, 9, 10, 11, 13, 14, 15, 16, 19, 20, 21, 22]:
+		for instagramUsername, instagramData in myData.items():
+			instagramPassword = instagramData[0]
+			profilePreferedHashtags = instagramData[1]
+			print(10000, instagramUsername)
+			driver = webdriver.Firefox()
+			#log to instagram
+			logInInstagram(driver, instagramUsername, instagramPassword)
+			posponeNotifications(driver)
+			time.sleep(1.0)
+			oneHourOnAutoPilot(driver, instagramUsername, instagramPassword, profilePreferedHashtags, followProfiles=False)
+	# wait for 1 to 2 hours
+	time.sleep(random.randint(3600, 7200))
